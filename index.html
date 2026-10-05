@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Who Should Pay?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        vibrantYellow: '#FFFF00',
+                        limeGreen: '#32CD32',
+                        borderBlack: '#000000',
+                        bgWhite: '#FAFAFA',
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'button': '0 4px 0 0 rgba(0,0,0,1)',
+                        'button-pressed': '0 0 0 0 rgba(0,0,0,1)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #FAFAFA;
+            color: #000000;
+            overflow-x: hidden;
+            min-height: 100vh; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Shake animation for wrong answers */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Pop animation for correct answers */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-in-out;
+        }
+
+        /* Fade in for explanations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        /* Custom button styles */
+        .choice-btn {
+            border: 2px solid #000000;
+            border-radius: 16px;
+            padding: 1rem;
+            text-align: left;
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 0 0 #000000;
+            background-color: #FFFFFF;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+        
+        .choice-btn:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 0 #000000;
+        }
+
+        .choice-btn:disabled {
+            cursor: default;
+            opacity: 0.9;
+        }
+
+        .choice-btn.correct {
+            background-color: #32CD32;
+            color: #FFFFFF;
+            border-color: #000000;
+        }
+
+        .choice-btn.wrong {
+            background-color: #ffcccc;
+            border-color: #000000;
+            color: #000000;
+        }
+
+        /* Hide scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FAFAFA; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        .progress-dot {
+            transition: all 0.3s ease;
+        }
+        .progress-dot.active {
+            background-color: #FFFF00;
+            border-color: #000000;
+            transform: scale(1.3);
+        }
+        .progress-dot.completed {
+            background-color: #000000;
+            border-color: #000000;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+
+    <div id="app" class="max-w-md mx-auto w-full flex-grow flex flex-col relative pb-8 h-[900px] overflow-y-auto">
+        
+        <!-- Header -->
+        <header class="p-6 pb-2" id="mainHeader">
+            <h1 class="text-3xl font-extrabold tracking-tight mb-4">Who Should Pay?</h1>
+            <div class="bg-vibrantYellow border-2 border-black rounded-xl p-5 shadow-button text-base font-medium leading-relaxed relative">
+                <div class="absolute -top-3 -right-3 bg-white border-2 border-black rounded-full p-2">
+                    <i data-lucide="wallet" class="w-6 h-6"></i>
+                </div>
+                <span class="font-bold block mb-2 text-lg">Scenario</span>
+                Nia, a county economist in Kenya, must decide how six projects are funded. For each project card, pick Public, Private, or Blend.
+            </div>
+        </header>
+
+        <div class="px-6 py-4 flex justify-between items-center" id="progressContainer">
+            <div class="flex space-x-2" id="progressDots">
+                <!-- Dots added by JS -->
+            </div>
+            <div class="font-bold text-sm" id="progressText">1 of 6</div>
+        </div>
+
+        <div class="px-6 flex-grow flex flex-col justify-start" id="interactionArea">
+            
+            <div class="bg-white border-2 border-black rounded-[24px] p-6 shadow-card mb-6">
+                <h3 class="text-2xl font-bold text-center" id="questionText">Project goes here</h3>
+            </div>
+            
+            <!-- Choices -->
+            <div class="space-y-4" id="choicesContainer">
+                <button class="choice-btn" id="btn-public">
+                    <span>Public</span>
+                    <div class="icon-holder w-8 h-8 flex items-center justify-center rounded-full"></div>
+                </button>
+                <button class="choice-btn" id="btn-private">
+                    <span>Private</span>
+                    <div class="icon-holder w-8 h-8 flex items-center justify-center rounded-full"></div>
+                </button>
+                <button class="choice-btn" id="btn-blend">
+                    <span>Blend</span>
+                    <div class="icon-holder w-8 h-8 flex items-center justify-center rounded-full"></div>
+                </button>
+            </div>
+
+            <div id="feedbackContainer" class="hidden mt-6 bg-white border-2 border-black rounded-2xl p-5 shadow-button">
+                <div class="flex items-start">
+                    <div id="feedbackIcon" class="mr-3 mt-1"></div>
+                    <div>
+                        <h4 class="font-bold text-lg mb-1" id="feedbackTitle">Correct!</h4>
+                        <p class="text-sm text-gray-800" id="feedbackText">Explanation goes here.</p>
+                    </div>
+                </div>
+                <button id="nextBtn" class="mt-5 w-full bg-vibrantYellow border-2 border-black rounded-xl py-4 text-lg font-bold shadow-button active:translate-y-[4px] active:shadow-button-pressed transition-all">
+                    Next Project
+                </button>
+            </div>
+
+        </div>
+
+        <div id="completionScreen" class="hidden px-6 flex-grow flex flex-col justify-center items-center text-center">
+            <div class="bg-white border-2 border-black rounded-[24px] p-8 shadow-card w-full max-w-sm relative mt-12">
+                <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-vibrantYellow rounded-full p-4 border-2 border-black shadow-button">
+                    <i data-lucide="award" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-3xl font-extrabold mt-6 mb-2">Analysis Complete!</h2>
+                
+                <div class="text-6xl font-black mb-4" id="finalScoreDisplay">6/6</div>
+                <p id="scoreFeedback" class="text-md font-medium text-gray-800 mb-6 px-2"></p>
+                
+                <div class="bg-gray-50 border-2 border-black rounded-xl p-5 mb-8 text-left">
+                    <p class="text-lg font-bold leading-relaxed">
+                        "Public money belongs where benefits are shared or private returns are too low. Blended finance covers the middle."
+                    </p>
+                </div>
+
+                <button id="restartBtn" class="w-full bg-white border-2 border-black rounded-xl py-4 font-bold text-lg shadow-button active:translate-y-[4px] active:shadow-button-pressed transition-all flex justify-center items-center">
+                    <i data-lucide="rotate-ccw" class="w-5 h-5 mr-2"></i> Try Again
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const questions = [
+            {
+                text: "A rural road to a farming area",
+                correct: "Public",
+                acceptable: ["Public"],
+                explanation: "Everyone benefits; no single firm can charge for it."
+            },
+            {
+                text: "A mobile payments app for urban shoppers",
+                correct: "Private",
+                acceptable: ["Private"],
+                explanation: "Profitable at scale; customers pay directly."
+            },
+            {
+                text: "Solar mini-grids for remote villages",
+                correct: "Blend",
+                acceptable: ["Blend"],
+                explanation: "Customers pay, but returns are too low or slow without support."
+            },
+            {
+                text: "A fruit-processing plant",
+                correct: "Blend",
+                acceptable: ["Blend"],
+                explanation: "Profitable once running, but early risk is high."
+            },
+            {
+                text: "Training for young software developers",
+                correct: "Public",
+                acceptable: ["Public", "Blend"], // Accepting both as per instructions
+                explanation: "Benefits spread across many firms. (Blend is also acceptable)."
+            },
+            {
+                text: "A shopping mall in the capital",
+                correct: "Private",
+                acceptable: ["Private"],
+                explanation: "Clear revenue; no public gap to fill."
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        const totalQuestions = questions.length;
+
+        // DOM Elements
+        const questionText = document.getElementById('questionText');
+        const btnPublic = document.getElementById('btn-public');
+        const btnPrivate = document.getElementById('btn-private');
+        const btnBlend = document.getElementById('btn-blend');
+        const feedbackContainer = document.getElementById('feedbackContainer');
+        const feedbackTitle = document.getElementById('feedbackTitle');
+        const feedbackText = document.getElementById('feedbackText');
+        const feedbackIcon = document.getElementById('feedbackIcon');
+        const nextBtn = document.getElementById('nextBtn');
+        const interactionArea = document.getElementById('interactionArea');
+        const completionScreen = document.getElementById('completionScreen');
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+        const restartBtn = document.getElementById('restartBtn');
+        const progressDotsContainer = document.getElementById('progressDots');
+        const progressText = document.getElementById('progressText');
+        const mainHeader = document.getElementById('mainHeader');
+        const progressContainer = document.getElementById('progressContainer');
+
+        const buttonsMap = {
+            'Public': btnPublic,
+            'Private': btnPrivate,
+            'Blend': btnBlend
+        };
+
+        function initProgressDots() {
+            progressDotsContainer.innerHTML = '';
+            for (let i = 0; i < totalQuestions; i++) {
+                const dot = document.createElement('div');
+                dot.className = `w-3 h-3 rounded-full border-2 border-gray-300 progress-dot`;
+                dot.id = `dot-${i}`;
+                progressDotsContainer.appendChild(dot);
+            }
+        }
+
+        function updateProgress() {
+            progressText.textContent = `${currentQuestionIndex + 1} of ${totalQuestions}`;
+            for (let i = 0; i < totalQuestions; i++) {
+                const dot = document.getElementById(`dot-${i}`);
+                if (i < currentQuestionIndex) {
+                    dot.className = "w-3 h-3 rounded-full border-2 progress-dot completed";
+                } else if (i === currentQuestionIndex) {
+                    dot.className = "w-3 h-3 rounded-full border-2 progress-dot active";
+                } else {
+                    dot.className = "w-3 h-3 rounded-full border-2 border-gray-300 progress-dot";
+                }
+            }
+        }
+
+        function loadQuestion() {
+            const q = questions[currentQuestionIndex];
+            questionText.textContent = q.text;
+            
+            // Reset buttons
+            [btnPublic, btnPrivate, btnBlend].forEach(btn => {
+                btn.disabled = false;
+                btn.className = 'choice-btn';
+                const iconHolder = btn.querySelector('.icon-holder');
+                iconHolder.innerHTML = ''; 
+                btn.style.boxShadow = '';
+            });
+            
+            feedbackContainer.classList.add('hidden');
+            updateProgress();
+        }
+
+        function handleChoice(selectedChoice, selectedBtn) {
+            const q = questions[currentQuestionIndex];
+            const isCorrect = q.acceptable.includes(selectedChoice);
+            
+            // Disable all buttons
+            [btnPublic, btnPrivate, btnBlend].forEach(btn => btn.disabled = true);
+
+            if (isCorrect) {
+                score++;
+                selectedBtn.classList.add('correct', 'animate-pop');
+                selectedBtn.querySelector('.icon-holder').innerHTML = '<i data-lucide="check" class="w-6 h-6 text-white"></i>';
+                showFeedback(true, q.explanation);
+            } else {
+                selectedBtn.classList.add('wrong', 'animate-shake');
+                selectedBtn.querySelector('.icon-holder').innerHTML = '<i data-lucide="x" class="w-6 h-6 text-black"></i>';
+                
+                // Highlight correct answer
+                const correctBtn = buttonsMap[q.correct];
+                correctBtn.classList.add('border-limeGreen', 'border-4');
+                correctBtn.style.boxShadow = 'none';
+                correctBtn.querySelector('.icon-holder').innerHTML = '<i data-lucide="check" class="w-6 h-6 text-limeGreen"></i>';
+                
+                showFeedback(false, q.explanation);
+            }
+            
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                feedbackContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+
+        btnPublic.addEventListener('click', () => handleChoice('Public', btnPublic));
+        btnPrivate.addEventListener('click', () => handleChoice('Private', btnPrivate));
+        btnBlend.addEventListener('click', () => handleChoice('Blend', btnBlend));
+
+        function showFeedback(isCorrect, explanation) {
+            feedbackContainer.classList.remove('hidden');
+            feedbackContainer.classList.add('animate-fade-in');
+            
+            if (isCorrect) {
+                feedbackTitle.textContent = "Correct!";
+                feedbackTitle.className = "font-bold text-xl mb-1 text-limeGreen";
+                feedbackContainer.classList.add('border-limeGreen');
+                feedbackContainer.classList.remove('border-red-500');
+                feedbackIcon.innerHTML = '<div class="bg-limeGreen rounded-full p-2 border-2 border-black"><i data-lucide="check" class="w-6 h-6 text-white"></i></div>';
+            } else {
+                feedbackTitle.textContent = "Incorrect";
+                feedbackTitle.className = "font-bold text-xl mb-1 text-red-600";
+                feedbackContainer.classList.add('border-red-500');
+                feedbackContainer.classList.remove('border-limeGreen');
+                feedbackIcon.innerHTML = '<div class="bg-red-200 rounded-full p-2 border-2 border-black"><i data-lucide="x" class="w-6 h-6 text-red-600"></i></div>';
+            }
+            
+            feedbackText.textContent = explanation;
+            lucide.createIcons();
+            
+            if (currentQuestionIndex === totalQuestions - 1) {
+                nextBtn.textContent = "View Results";
+            } else {
+                nextBtn.textContent = "Next Project";
+            }
+        }
+
+        nextBtn.addEventListener('click', () => {
+            feedbackContainer.classList.remove('animate-fade-in');
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex >= totalQuestions) {
+                showCompletionScreen();
+            } else {
+                loadQuestion();
+            }
+        });
+
+        function showCompletionScreen() {
+            mainHeader.style.display = 'none';
+            progressContainer.style.display = 'none';
+            interactionArea.style.display = 'none';
+            
+            completionScreen.classList.remove('hidden');
+            completionScreen.classList.add('animate-fade-in');
+            
+            finalScoreDisplay.textContent = `${score}/${totalQuestions}`;
+            const feedbackElement = document.getElementById('scoreFeedback');
+            
+            // Note: Keeping the requested pass/fail text logic, adapted for a 6-question quiz.
+            // Full marks (6/6) = Perfect
+            // Pass (4-5)
+            // Fail (< 4)
+            if (score === totalQuestions) {
+                finalScoreDisplay.className = "text-6xl font-black text-limeGreen mb-2";
+                feedbackElement.innerHTML = "<strong>Flawless!</strong> A perfect score! Outstanding work identifying the right funding models. Your performance here is going to be a huge help with the module's assignment!";
+            } else if (score >= 4) {
+                finalScoreDisplay.className = "text-6xl font-black text-vibrantYellow mb-2 drop-shadow-md";
+                finalScoreDisplay.style.webkitTextStroke = "2px black";
+                feedbackElement.innerHTML = "<strong>Great job, you passed!</strong> You have a solid grasp of the concepts. Why not try again and reach for a perfect score? Nailing all questions will really help you with the module's assignment!";
+            } else {
+                finalScoreDisplay.className = "text-6xl font-black text-black mb-2";
+                feedbackElement.innerHTML = "<strong>Keep practicing!</strong> You didn't quite make the mark this time. Try again and aim for a perfect score—mastering these details will give you a big advantage on the module's assignment!";
+            }
+        }
+
+        restartBtn.addEventListener('click', () => {
+            currentQuestionIndex = 0;
+            score = 0;
+            
+            mainHeader.style.display = 'block';
+            progressContainer.style.display = 'flex';
+            interactionArea.style.display = 'flex';
+            completionScreen.classList.add('hidden');
+            finalScoreDisplay.style.webkitTextStroke = "none";
+            
+            initProgressDots();
+            loadQuestion();
+            document.getElementById('app').scrollTop = 0;
+        });
+
+        // Start
+        initProgressDots();
+        loadQuestion();
+
+    </script>
+</body>
+</html>
